@@ -248,9 +248,3 @@ payment-gateway/
 └── package.json
 ```
 
----
-
-## 💡 Resume Bullet
-
-> Engineered a scalable payment gateway simulator in Node.js featuring idempotent APIs, exponential-backoff retry logic, intelligent multi-gateway routing, Redis-based sliding-window rate limiting, and circuit breaker pattern — with a real-time metrics dashboard and async job queue for high-throughput payment processing.
-```
