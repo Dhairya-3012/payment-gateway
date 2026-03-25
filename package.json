@@ -1,0 +1,24 @@
+{
+  "name": "payment-gateway-simulator",
+  "version": "1.0.0",
+  "description": "Scalable payment gateway simulator with idempotency, retry, circuit breaker, and intelligent routing",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js",
+    "test": "node tests/load-test.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "pg": "^8.11.3",
+    "redis": "^4.6.10",
+    "uuid": "^9.0.0",
+    "dotenv": "^16.3.1",
+    "cors": "^2.8.5",
+    "winston": "^3.11.0",
+    "express-async-errors": "^3.1.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  }
+}

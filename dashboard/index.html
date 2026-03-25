@@ -1,0 +1,822 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Payment Gateway — Control Room</title>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600;700&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg:        #080c12;
+      --surface:   #0e1521;
+      --border:    #1a2538;
+      --accent:    #00e5a0;
+      --accent2:   #3b82f6;
+      --warn:      #f59e0b;
+      --danger:    #ef4444;
+      --text:      #e2e8f0;
+      --muted:     #64748b;
+      --success:   #10b981;
+      --font-mono: 'JetBrains Mono', monospace;
+      --font-main: 'Space Grotesk', sans-serif;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-main);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── Scanline overlay ── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0,229,160,0.015) 2px,
+        rgba(0,229,160,0.015) 4px
+      );
+      pointer-events: none;
+      z-index: 9999;
+    }
+
+    /* ── Header ── */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 20px 32px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .logo-icon {
+      width: 36px; height: 36px;
+      background: var(--accent);
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px;
+    }
+
+    .logo-text {
+      font-size: 15px;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: var(--accent);
+    }
+
+    .logo-sub {
+      font-size: 11px;
+      color: var(--muted);
+      font-family: var(--font-mono);
+      letter-spacing: 0.1em;
+    }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .live-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--accent);
+      letter-spacing: 0.1em;
+    }
+
+    .live-dot {
+      width: 8px; height: 8px;
+      background: var(--accent);
+      border-radius: 50%;
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.8); }
+    }
+
+    .refresh-btn {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      padding: 6px 14px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-family: var(--font-mono);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .refresh-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+    /* ── Layout ── */
+    main {
+      padding: 28px 32px;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    /* ── Section label ── */
+    .section-label {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .section-label::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    /* ── KPI Cards ── */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin-bottom: 28px;
+    }
+
+    .kpi-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      position: relative;
+      overflow: hidden;
+      transition: border-color 0.2s;
+    }
+
+    .kpi-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+      background: var(--accent-color, var(--accent));
+      opacity: 0.7;
+    }
+
+    .kpi-card:hover { border-color: var(--accent); }
+
+    .kpi-label {
+      font-size: 11px;
+      font-family: var(--font-mono);
+      letter-spacing: 0.1em;
+      color: var(--muted);
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+
+    .kpi-value {
+      font-size: 32px;
+      font-weight: 700;
+      font-family: var(--font-mono);
+      color: var(--accent-color, var(--accent));
+      line-height: 1;
+      margin-bottom: 6px;
+    }
+
+    .kpi-sub {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    /* ── Charts row ── */
+    .charts-row {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 16px;
+      margin-bottom: 28px;
+    }
+
+    .chart-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .chart-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 4px;
+    }
+
+    .chart-subtitle {
+      font-size: 11px;
+      color: var(--muted);
+      font-family: var(--font-mono);
+      margin-bottom: 20px;
+    }
+
+    .chart-wrap {
+      position: relative;
+      height: 200px;
+    }
+
+    /* ── Gateway + Circuit Breaker ── */
+    .bottom-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 28px;
+    }
+
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .panel-title {
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    /* ── Gateway rows ── */
+    .gateway-row {
+      display: grid;
+      grid-template-columns: 110px 1fr 80px 80px 80px;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 12px;
+    }
+    .gateway-row:last-child { border-bottom: none; }
+
+    .gateway-name {
+      font-family: var(--font-mono);
+      font-weight: 600;
+      font-size: 11px;
+      color: var(--accent);
+    }
+
+    .progress-bar {
+      background: var(--border);
+      border-radius: 4px;
+      height: 6px;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      border-radius: 4px;
+      background: var(--accent);
+      transition: width 0.6s ease;
+    }
+
+    .stat-cell {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      text-align: right;
+      color: var(--muted);
+    }
+
+    /* ── Circuit Breaker ── */
+    .cb-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .cb-row:last-child { border-bottom: none; }
+
+    .cb-name {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .cb-badge {
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+    }
+
+    .badge-closed  { background: rgba(16,185,129,0.15); color: var(--success); }
+    .badge-open    { background: rgba(239,68,68,0.15);  color: var(--danger);  }
+    .badge-half    { background: rgba(245,158,11,0.15); color: var(--warn);    }
+
+    .cb-stats {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+
+    .reset-btn {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      padding: 4px 10px;
+      border-radius: 5px;
+      font-size: 10px;
+      font-family: var(--font-mono);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .reset-btn:hover { border-color: var(--warn); color: var(--warn); }
+
+    /* ── Recent Transactions ── */
+    .txn-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+
+    .txn-table th {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--muted);
+      text-align: left;
+      padding: 0 12px 10px 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .txn-table td {
+      padding: 10px 12px 10px 0;
+      border-bottom: 1px solid var(--border);
+      color: var(--text);
+      font-family: var(--font-mono);
+    }
+
+    .txn-table tr:last-child td { border-bottom: none; }
+
+    .status-pill {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+    }
+    .pill-success { background: rgba(16,185,129,0.15); color: var(--success); }
+    .pill-failed  { background: rgba(239,68,68,0.15);  color: var(--danger);  }
+    .pill-pending { background: rgba(245,158,11,0.15); color: var(--warn);    }
+
+    /* ── Pay test form ── */
+    .test-panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 28px;
+    }
+
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr auto;
+      gap: 12px;
+      align-items: end;
+    }
+
+    .form-group label {
+      display: block;
+      font-size: 11px;
+      font-family: var(--font-mono);
+      color: var(--muted);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+
+    .form-group input,
+    .form-group select {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 10px 12px;
+      border-radius: 8px;
+      font-family: var(--font-mono);
+      font-size: 13px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .form-group input:focus,
+    .form-group select:focus { border-color: var(--accent); }
+
+    .form-group select option { background: var(--surface); }
+
+    .pay-btn {
+      background: var(--accent);
+      color: #080c12;
+      border: none;
+      padding: 10px 24px;
+      border-radius: 8px;
+      font-weight: 700;
+      font-size: 13px;
+      font-family: var(--font-mono);
+      cursor: pointer;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+    .pay-btn:hover { opacity: 0.85; }
+    .pay-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .pay-result {
+      margin-top: 14px;
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      display: none;
+    }
+    .pay-result.success { background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.3); color: var(--success); }
+    .pay-result.error   { background: rgba(239,68,68,0.1);  border: 1px solid rgba(239,68,68,0.3);  color: var(--danger);  }
+
+    /* ── Loader ── */
+    .loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 200px;
+      color: var(--muted);
+      font-family: var(--font-mono);
+      font-size: 13px;
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 1024px) {
+      .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+      .charts-row, .bottom-row { grid-template-columns: 1fr; }
+      .form-row { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">⚡</div>
+    <div>
+      <div class="logo-text">PayGateway</div>
+      <div class="logo-sub">CONTROL ROOM v1.0</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="live-badge">
+      <div class="live-dot"></div>
+      LIVE
+    </div>
+    <button class="refresh-btn" onclick="fetchAll()">↻ REFRESH</button>
+  </div>
+</header>
+
+<main>
+
+  <!-- Test payment -->
+  <div class="section-label">🧪 Test Payment</div>
+  <div class="test-panel">
+    <div class="form-row">
+      <div class="form-group">
+        <label>User ID</label>
+        <input id="inp-user" type="text" value="user_001" />
+      </div>
+      <div class="form-group">
+        <label>Amount (₹)</label>
+        <input id="inp-amount" type="number" value="1500" min="1" />
+      </div>
+      <div class="form-group">
+        <label>Method</label>
+        <select id="inp-method">
+          <option>UPI</option>
+          <option>CARD</option>
+          <option>NETBANKING</option>
+          <option>WALLET</option>
+        </select>
+      </div>
+      <button class="pay-btn" id="pay-btn" onclick="testPay()">▶ PAY NOW</button>
+    </div>
+    <div class="pay-result" id="pay-result"></div>
+  </div>
+
+  <!-- KPIs -->
+  <div class="section-label">📊 Overview</div>
+  <div class="kpi-grid" id="kpi-grid">
+    <div class="loading">Loading metrics...</div>
+  </div>
+
+  <!-- Charts -->
+  <div class="section-label">📈 Time Series — Last 60 min</div>
+  <div class="charts-row">
+    <div class="chart-card">
+      <div class="chart-title">Transaction Volume</div>
+      <div class="chart-subtitle">Transactions per minute</div>
+      <div class="chart-wrap">
+        <canvas id="chart-volume"></canvas>
+      </div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Payment Methods</div>
+      <div class="chart-subtitle">Distribution</div>
+      <div class="chart-wrap">
+        <canvas id="chart-methods"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Gateways + Circuit Breakers -->
+  <div class="section-label">🔀 Gateway Intelligence</div>
+  <div class="bottom-row">
+    <div class="panel">
+      <div class="panel-title">
+        <span>Gateway Performance</span>
+        <span style="font-size:11px;color:var(--muted);font-family:var(--font-mono);">LIVE ROUTING</span>
+      </div>
+      <div id="gateway-panel"><div class="loading" style="height:120px">Loading...</div></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">
+        <span>Circuit Breakers</span>
+      </div>
+      <div id="cb-panel"><div class="loading" style="height:120px">Loading...</div></div>
+    </div>
+  </div>
+
+  <!-- Recent Transactions -->
+  <div class="section-label">🧾 Recent Transactions</div>
+  <div class="panel" style="margin-bottom:40px">
+    <div id="txn-panel"><div class="loading">Loading...</div></div>
+  </div>
+
+</main>
+
+<script>
+  const API = '';  // same origin
+  let volumeChart, methodChart;
+
+  // ── KPI Cards ──────────────────────────────────────────────────────────────
+  const KPI_DEFS = [
+    { key: 'total_transactions', label: 'Total Transactions', color: 'var(--accent2)', suffix: '' },
+    { key: 'success_rate',       label: 'Success Rate',       color: 'var(--success)', suffix: '%' },
+    { key: 'total_volume',       label: 'Total Volume',       color: 'var(--accent)',  prefix: '₹' },
+    { key: 'avg_retries',        label: 'Avg Retries',        color: 'var(--warn)',    suffix: 'x' },
+  ];
+
+  function renderKPIs(overview) {
+    const grid = document.getElementById('kpi-grid');
+    grid.innerHTML = KPI_DEFS.map(def => {
+      const raw = overview[def.key] ?? '—';
+      const val = raw !== '—' ? `${def.prefix || ''}${parseFloat(raw).toLocaleString('en-IN')}${def.suffix || ''}` : '—';
+      return `
+        <div class="kpi-card" style="--accent-color:${def.color}">
+          <div class="kpi-label">${def.label}</div>
+          <div class="kpi-value">${val}</div>
+          <div class="kpi-sub">${overview.successful || 0} success / ${overview.failed || 0} failed</div>
+        </div>`;
+    }).join('');
+  }
+
+  // ── Charts ─────────────────────────────────────────────────────────────────
+  const CHART_DEFAULTS = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: {
+      x: { grid: { color: '#1a2538' }, ticks: { color: '#64748b', font: { family: 'JetBrains Mono', size: 10 } } },
+      y: { grid: { color: '#1a2538' }, ticks: { color: '#64748b', font: { family: 'JetBrains Mono', size: 10 } } },
+    },
+  };
+
+  function initCharts() {
+    const vCtx = document.getElementById('chart-volume').getContext('2d');
+    volumeChart = new Chart(vCtx, {
+      type: 'line',
+      data: { labels: [], datasets: [
+        { label: 'Success', data: [], borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,0.1)', fill: true, tension: 0.4, pointRadius: 2 },
+        { label: 'Failed',  data: [], borderColor: '#ef4444', backgroundColor: 'rgba(239,68,68,0.1)',  fill: true, tension: 0.4, pointRadius: 2 },
+      ]},
+      options: { ...CHART_DEFAULTS, plugins: { legend: { display: true, labels: { color: '#64748b', font: { family: 'JetBrains Mono', size: 10 } } } } },
+    });
+
+    const mCtx = document.getElementById('chart-methods').getContext('2d');
+    methodChart = new Chart(mCtx, {
+      type: 'doughnut',
+      data: { labels: [], datasets: [{ data: [], backgroundColor: ['#00e5a0','#3b82f6','#f59e0b','#a855f7'], borderWidth: 0 }] },
+      options: { responsive: true, maintainAspectRatio: false, cutout: '65%',
+        plugins: { legend: { position: 'bottom', labels: { color: '#94a3b8', font: { family: 'JetBrains Mono', size: 11 }, padding: 16 } } },
+      },
+    });
+  }
+
+  function updateCharts(timeSeries, methodBreakdown) {
+    if (timeSeries && timeSeries.length) {
+      const labels = timeSeries.map(r => new Date(r.bucket).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }));
+      volumeChart.data.labels = labels;
+      volumeChart.data.datasets[0].data = timeSeries.map(r => r.successful);
+      volumeChart.data.datasets[1].data = timeSeries.map(r => r.failed);
+      volumeChart.update('none');
+    }
+
+    if (methodBreakdown && methodBreakdown.length) {
+      methodChart.data.labels = methodBreakdown.map(r => r.method);
+      methodChart.data.datasets[0].data = methodBreakdown.map(r => r.total);
+      methodChart.update('none');
+    }
+  }
+
+  // ── Gateway panel ──────────────────────────────────────────────────────────
+  function renderGateways(gateways) {
+    const html = gateways.map(g => {
+      const rate = parseFloat(g.success_rate) || 0;
+      const barColor = rate > 70 ? 'var(--success)' : rate > 40 ? 'var(--warn)' : 'var(--danger)';
+      return `
+        <div class="gateway-row">
+          <span class="gateway-name">${g.gateway_name}</span>
+          <div class="progress-bar">
+            <div class="progress-fill" style="width:${rate}%;background:${barColor}"></div>
+          </div>
+          <span class="stat-cell">${rate}%</span>
+          <span class="stat-cell">${g.total_requests}</span>
+          <span class="stat-cell">${Math.round(g.avg_response_time_ms)}ms</span>
+        </div>`;
+    }).join('');
+
+    document.getElementById('gateway-panel').innerHTML = `
+      <div style="display:grid;grid-template-columns:110px 1fr 80px 80px 80px;gap:12px;
+                  font-family:'JetBrains Mono';font-size:10px;color:var(--muted);
+                  letter-spacing:0.1em;text-transform:uppercase;padding-bottom:8px;
+                  border-bottom:1px solid var(--border);margin-bottom:4px">
+        <span>Gateway</span><span>Success Rate</span><span style="text-align:right">Rate</span>
+        <span style="text-align:right">Requests</span><span style="text-align:right">Avg ms</span>
+      </div>
+      ${html}`;
+  }
+
+  // ── Circuit Breaker panel ──────────────────────────────────────────────────
+  function renderCircuitBreakers(breakers, gatewayStats) {
+    if (!breakers.length) {
+      // Show all gateways as CLOSED by default
+      const names = ['GATEWAY_A', 'GATEWAY_B', 'GATEWAY_C'];
+      breakers = names.map(n => ({ name: n, state: 'CLOSED', failureCount: 0, successCount: 0 }));
+    }
+
+    document.getElementById('cb-panel').innerHTML = breakers.map(b => {
+      const badgeClass = b.state === 'CLOSED' ? 'badge-closed' : b.state === 'OPEN' ? 'badge-open' : 'badge-half';
+      return `
+        <div class="cb-row">
+          <div>
+            <div class="cb-name">${b.name}</div>
+            <div class="cb-stats">Failures: ${b.failureCount} | Success: ${b.successCount}</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <span class="cb-badge ${badgeClass}">${b.state}</span>
+            <button class="reset-btn" onclick="resetCB('${b.name}')">RESET</button>
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  // ── Transaction table ──────────────────────────────────────────────────────
+  function renderTransactions(txns) {
+    if (!txns.length) {
+      document.getElementById('txn-panel').innerHTML = '<div class="loading">No transactions yet. Try the test form above!</div>';
+      return;
+    }
+
+    const rows = txns.map(t => {
+      const pill = t.status === 'SUCCESS' ? 'pill-success' : t.status === 'FAILED' ? 'pill-failed' : 'pill-pending';
+      const time = new Date(t.created_at).toLocaleTimeString('en-IN');
+      return `
+        <tr>
+          <td style="color:var(--muted)">${t.transaction_id.slice(0,16)}…</td>
+          <td>${t.user_id}</td>
+          <td>₹${parseFloat(t.amount).toLocaleString('en-IN')}</td>
+          <td>${t.method}</td>
+          <td style="color:var(--muted)">${t.gateway || '—'}</td>
+          <td><span class="status-pill ${pill}">${t.status}</span></td>
+          <td style="color:var(--muted)">${t.retry_count}</td>
+          <td style="color:var(--muted)">${time}</td>
+        </tr>`;
+    }).join('');
+
+    document.getElementById('txn-panel').innerHTML = `
+      <table class="txn-table">
+        <thead><tr>
+          <th>TXN ID</th><th>USER</th><th>AMOUNT</th>
+          <th>METHOD</th><th>GATEWAY</th><th>STATUS</th><th>RETRIES</th><th>TIME</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>`;
+  }
+
+  // ── Fetch all metrics ──────────────────────────────────────────────────────
+  async function fetchAll() {
+    try {
+      const res = await fetch(`${API}/api/metrics`);
+      const data = await res.json();
+
+      if (!data.success) return;
+
+      renderKPIs(data.overview);
+      updateCharts(data.timeSeries, data.methodBreakdown);
+      renderGateways(data.gateways);
+      renderCircuitBreakers(data.circuitBreakers, data.gateways);
+      renderTransactions(data.recentTransactions);
+    } catch (err) {
+      console.error('Metrics fetch failed:', err);
+    }
+  }
+
+  // ── Test pay ───────────────────────────────────────────────────────────────
+  async function testPay() {
+    const btn = document.getElementById('pay-btn');
+    const resultEl = document.getElementById('pay-result');
+    btn.disabled = true;
+    btn.textContent = '⏳ Processing…';
+    resultEl.style.display = 'none';
+
+    const idempotencyKey = `dashboard_${Date.now()}`;
+
+    try {
+      const res = await fetch(`${API}/api/pay`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Idempotency-Key': idempotencyKey },
+        body: JSON.stringify({
+          userId: document.getElementById('inp-user').value,
+          amount: parseFloat(document.getElementById('inp-amount').value),
+          method: document.getElementById('inp-method').value,
+        }),
+      });
+
+      const data = await res.json();
+
+      resultEl.className = `pay-result ${data.success ? 'success' : 'error'}`;
+      resultEl.style.display = 'block';
+      resultEl.textContent = data.success
+        ? `✅ SUCCESS — ${data.transactionId} via ${data.gateway} (retries: ${data.retryCount})`
+        : `❌ FAILED — ${data.error} (retries: ${data.retryCount})`;
+
+      // Refresh metrics after payment
+      setTimeout(fetchAll, 500);
+    } catch (err) {
+      resultEl.className = 'pay-result error';
+      resultEl.style.display = 'block';
+      resultEl.textContent = `❌ Network error: ${err.message}`;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '▶ PAY NOW';
+    }
+  }
+
+  // ── Circuit breaker reset ──────────────────────────────────────────────────
+  async function resetCB(name) {
+    try {
+      await fetch(`${API}/api/metrics/circuit/${name}/reset`, { method: 'POST' });
+      fetchAll();
+    } catch (err) {
+      console.error('Reset failed:', err);
+    }
+  }
+
+  // ── Boot ───────────────────────────────────────────────────────────────────
+  initCharts();
+  fetchAll();
+  setInterval(fetchAll, 5000);  // auto-refresh every 5s
+</script>
+</body>
+</html>
